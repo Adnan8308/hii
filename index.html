@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>Syllabus Tracker</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-maskable-512.png">
+<style>
+:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--ink:#3b3f5c;--mute:#8a8fa8;--line:#eceef6;--card:#f7f8fd}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*:before,*:after{box-sizing:inherit}
+body{margin:0;background:#fff;color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+.wrap{max-width:480px;margin:0 auto;padding:16px 16px 48px}
+h1{font-size:24px;margin:8px 0 4px;font-weight:700}
+.top{display:flex;align-items:center;gap:8px}
+.top h1{flex:1;margin:8px 0}
+.back{border:0;background:#eceef8;color:#5b5f94;width:44px;height:44px;border-radius:14px;font-size:26px;line-height:1}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px;margin:12px 0}
+.sc{display:flex;align-items:center;gap:14px;cursor:pointer}
+.sc>span{font-weight:700;color:var(--c,#7a7fc4)}
+.sub{color:var(--mute);font-size:14px}
+.bar{height:8px;border-radius:8px;background:#e9ebf6;overflow:hidden;margin:8px 0 4px}
+.bar i{display:block;height:100%;border-radius:8px;transition:width .3s}
+.leg{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:14px;font-size:14px}
+.leg b{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+.topic{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);min-height:52px;cursor:pointer}
+.topic:last-child{border-bottom:0}
+.chk{width:26px;height:26px;border-radius:9px;border:2px solid #c9cde6;flex:none;display:grid;place-items:center;color:#fff;font-size:15px}
+.topic.on .chk{background:var(--c);border-color:var(--c)}
+.topic .nm{flex:1}
+.topic.on .nm{color:var(--mute);text-decoration:line-through}
+.x{border:0;background:none;color:#a9adc6;font:inherit;font-size:20px;min-width:44px;min-height:44px}
+.btn{border:0;border-radius:14px;padding:12px 16px;background:#7a7fc4;color:#fff;font:inherit;font-weight:600;min-height:46px;width:100%}
+.btn.g{background:#eceef8;color:#5b5f94}
+.btn+.btn{margin-top:8px}
+textarea{width:100%;min-height:110px;border:1px solid #dcdff0;border-radius:14px;padding:12px;font:inherit;font-size:15px;color:var(--ink);background:#fff;margin-bottom:10px;resize:vertical}
+.hint{font-size:13px;color:var(--mute);margin:0 0 10px}
+</style></head>
+<body><div class="wrap" id="app"></div>
+<script>
+const COL={a:['#7fa3d9','#e3ebf7'],p:['#a58fd6','#ece6f7'],b:['#7a7fc4','#e4e5f4']};
+let S=null;
+try{S=JSON.parse(localStorage.getItem('syl1'))}catch(e){}
+if(!Array.isArray(S)||!S.length)S=[{id:'a',name:'Anatomy',ch:[]},{id:'p',name:'Physiology',ch:[]},{id:'b',name:'Biochemistry',ch:[]}];
+const save=()=>{try{localStorage.setItem('syl1',JSON.stringify(S))}catch(e){}};
+let V={s:null,c:null},pend=null,sheet=false;
+const app=document.getElementById('app');
+const uid=()=>Math.random().toString(36).slice(2,9);
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const cnt=s=>{let n=0,d=0;s.ch.forEach(c=>c.t.forEach(t=>{n++;if(t.d)d++}));return[n,d]};
+const pct=(d,n)=>n?Math.round(d/n*100):0;
+const cur=()=>S.find(x=>x.id===V.s);
+const CH=()=>cur().ch.find(c=>c.id===V.c);
+
+function donut(segs,size,sw,big,small){
+  const r=(size-sw)/2,m=size/2,C=2*Math.PI*r,T=segs.reduce((a,s)=>a+s.n,0);
+  const arc=(o,len,col)=>`<circle cx="${m}" cy="${m}" r="${r}" fill="none" stroke="${col}" stroke-width="${sw}" stroke-dasharray="${Math.max(len,0.01)} ${C}" stroke-dashoffset="${-o}" transform="rotate(-90 ${m} ${m})"/>`;
+  let out=`<circle cx="${m}" cy="${m}" r="${r}" fill="none" stroke="#eef0f8" stroke-width="${sw}"/>`,o=0;
+  if(T){
+    const gap=segs.filter(s=>s.n).length>1?3:0;
+    segs.forEach(s=>{
+      if(!s.n)return;
+      const L=s.n/T*C;
+      out+=arc(o,L-gap,s.t);
+      if(s.d)out+=arc(o,s.d===s.n?L-gap:s.d/T*C,s.c);
+      o+=L;
+    });
+  }
+  if(big!==undefined){
+    const f=size*0.19;
+    out+=`<text x="${m}" y="${small?m+f*0.3:m+f*0.35}" text-anchor="middle" font-size="${f}" font-weight="700" fill="#3b3f5c">${big}</text>`;
+    if(small)out+=`<text x="${m}" y="${m+f*1.2}" text-anchor="middle" font-size="${f*0.42}" fill="#8a8fa8">${small}</text>`;
+  }
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="flex:none">${out}</svg>`;
+}
+
+function home(){
+  const segs=S.map(s=>{const[n,d]=cnt(s);return{n,d,c:COL[s.id][0],t:COL[s.id][1]}});
+  const N=segs.reduce((a,s)=>a+s.n,0),D=segs.reduce((a,s)=>a+s.d,0);
+  let h=`<h1>My Syllabus</h1><div class="card" style="text-align:center">${donut(segs,230,28,pct(D,N)+'%','of syllabus read')}
+  <div class="sub" style="margin-top:8px">${N?D+' of '+N+' topics read':'Open a subject and add your chapters to begin'}</div>
+  <div class="leg">${S.map(s=>{const[n,d]=cnt(s);return `<span><b style="background:${COL[s.id][0]}"></b>${s.name} ${pct(d,n)}%</span>`}).join('')}</div></div>`;
+  S.forEach(s=>{
+    const[n,d]=cnt(s),[c,t]=COL[s.id];
+    h+=`<div class="card sc" data-a="open" data-s="${s.id}" style="--c:${c}">${donut([{n,d,c,t}],58,9)}
+    <div style="flex:1"><b>${s.name}</b><div class="sub">${d} / ${n} topics · ${s.ch.length} chapters</div></div><span>${pct(d,n)}%</span></div>`;
+  });
+  return h;
+}
+
+function subj(){
+  const s=cur(),[n,d]=cnt(s),[c,t]=COL[s.id];
+  let h=`<div class="top"><button class="back" data-a="back">‹</button><h1>${esc(s.name)}</h1></div>
+  <div class="card" style="display:flex;align-items:center;gap:16px">${donut([{n,d,c,t}],96,13,pct(d,n)+'%')}
+  <div class="sub">${d} of ${n} topics read<br>${s.ch.length} chapters</div></div>`;
+  s.ch.forEach(ch=>{
+    const cn=ch.t.length,cd=ch.t.filter(x=>x.d).length;
+    h+=`<div class="card sc" data-a="openc" data-c="${ch.id}" style="--c:${c}"><div style="flex:1"><b>${esc(ch.name)}</b>
+    <div class="bar"><i style="width:${pct(cd,cn)}%;background:${c}"></i></div><div class="sub">${cd} / ${cn} topics</div></div><span>${pct(cd,cn)}%</span></div>`;
+  });
+  if(sheet){
+    h+=`<div class="card"><p class="hint">Type each chapter on its own line. Put “-” before each topic of that chapter.</p>
+    <textarea id="bulk" placeholder="Upper Limb&#10;- Brachial plexus&#10;- Shoulder joint&#10;Lower Limb&#10;- Hip joint"></textarea>
+    <button class="btn" data-a="addch">Add</button><button class="btn g" data-a="sheet">Cancel</button></div>`;
+  }else h+=`<button class="btn" data-a="sheet">+ Add chapters &amp; topics</button>`;
+  return h;
+}
+
+function chap(){
+  const s=cur(),c=CH(),col=COL[s.id][0],n=c.t.length,d=c.t.filter(t=>t.d).length;
+  return `<div style="--c:${col}"><div class="top"><button class="back" data-a="back">‹</button><h1>${esc(c.name)}</h1></div>
+  <div class="card"><div class="bar"><i style="width:${pct(d,n)}%;background:${col}"></i></div><div class="sub">${d} of ${n} topics read · ${pct(d,n)}%</div></div>
+  <div class="card" style="padding:4px 14px">${n?c.t.map(t=>`<div class="topic ${t.d?'on':''}" data-a="tog" data-t="${t.id}"><span class="chk">${t.d?'✓':''}</span><span class="nm">${esc(t.name)}</span><button class="x" data-a="delt" data-t="${t.id}">${pend==='t'+t.id?'<small style="color:#b0688a">Delete?</small>':'×'}</button></div>`).join(''):'<div class="sub" style="padding:12px 0">No topics yet</div>'}</div>
+  <div class="card"><textarea id="nt" placeholder="Add topics, one per line"></textarea><button class="btn" data-a="addt">Add topics</button></div>
+  <button class="btn g" data-a="delc">${pend==='c'+c.id?'Tap again to delete chapter':'Delete chapter'}</button></div>`;
+}
+
+function render(keep){
+  const y=keep?scrollY:0;
+  app.innerHTML=V.c?chap():V.s?subj():home();
+  scrollTo(0,y);
+}
+
+function parse(txt,s){
+  let cur=null;
+  txt.split('\n').forEach(l=>{
+    l=l.trim();if(!l)return;
+    const m=l.match(/^[-•*]\s*(.+)/);
+    if(m){
+      if(!cur){cur={id:uid(),name:'General',t:[]};s.ch.push(cur)}
+      cur.t.push({id:uid(),name:m[1],d:0});
+    }else{cur={id:uid(),name:l,t:[]};s.ch.push(cur)}
+  });
+}
+
+document.addEventListener('click',e=>{
+  const el=e.target.closest('[data-a]');if(!el)return;
+  const a=el.dataset.a,D=el.dataset;
+  const nav=['open','back','openc'].includes(a);
+  if(a==='open'){V.s=D.s;V.c=null;sheet=false}
+  else if(a==='back'){if(V.c)V.c=null;else V.s=null;sheet=false;pend=null}
+  else if(a==='openc'){V.c=D.c}
+  else if(a==='tog'){const t=CH().t.find(x=>x.id===D.t);t.d=t.d?0:1;save()}
+  else if(a==='sheet'){sheet=!sheet}
+  else if(a==='addch'){parse(document.getElementById('bulk').value,cur());sheet=false;save()}
+  else if(a==='addt'){
+    document.getElementById('nt').value.split('\n').forEach(l=>{l=l.trim().replace(/^[-•*]\s*/,'');if(l)CH().t.push({id:uid(),name:l,d:0})});
+    save();
+  }
+  else if(a==='delt'||a==='delc'){
+    e.stopPropagation();
+    const k=a==='delt'?'t'+D.t:'c'+V.c;
+    if(pend===k){
+      pend=null;
+      if(a==='delt')CH().t=CH().t.filter(x=>x.id!==D.t);
+      else{cur().ch=cur().ch.filter(x=>x.id!==V.c);V.c=null}
+      save();
+    }else{pend=k;setTimeout(()=>{if(pend===k){pend=null;render(true)}},3000)}
+  }
+  render(!nav&&!(a==='delc'&&!V.c));
+});
+render();
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script></body></html>
